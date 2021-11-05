@@ -25,6 +25,7 @@ declare module 'janus-gateway' {
   }
 
   interface JSEP {
+    sdp: string
   }
 
   interface InitOptions {
@@ -70,6 +71,12 @@ declare module 'janus-gateway' {
     };
     error?: Error;
   }
+
+  type EvtMessage = Message & Partial<{
+    videoroom: string
+    id: string
+    display: string
+  }>
 
   interface PluginOptions {
     plugin: string;
@@ -125,6 +132,15 @@ declare module 'janus-gateway' {
     jsep?: JSEP;
     success?: Function;
     error?: (error: any) => void;
+  }
+
+  interface FeedPublisher {
+    audio_codec: string
+    display: string
+    id: string
+    streams: { type: 'video' | 'audio', mindex: number, mid: string, codec: string, talking?: boolean }[]
+    talking: boolean
+    video_codec: string
   }
 
   interface PluginHandle {
@@ -185,6 +201,12 @@ declare module 'janus-gateway' {
     detach(params: any): void;
   }
 
+  type SubscriptionHandle = PluginHandle & Partial<{
+    videoCodec: string
+    rfdisplay: string
+    rfid: string
+  }>
+
   class Janus {
     static webRTCAdapter: any
     static safariVp8: boolean
@@ -229,8 +251,8 @@ declare module 'janus-gateway' {
 
 
 declare namespace process {
-    const env: {
-      JANUS_DEBUG: string
-      WEBRTC_SERVER: string
-    }
+  const env: {
+    JANUS_DEBUG: string
+    WEBRTC_SERVER: string
+  }
 }
