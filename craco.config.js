@@ -3,6 +3,14 @@ const Dotenv = require('dotenv-webpack');
 
 module.exports = {
   reactScriptsVersion: 'webpack-5-react-scripts',
+  style: {
+    postcss: {
+      plugins: [
+        require('tailwindcss'),
+        require('autoprefixer'),
+      ],
+    },
+  },
   webpack: {
     plugins: {
       add: [

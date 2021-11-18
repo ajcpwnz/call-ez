@@ -1,26 +1,39 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import styled from 'styled-components'
-import { streamingClient } from './utils/webrtc/client';
-import { Video } from './features/streaming/Video'
+import { useSelector } from 'react-redux'
 import { colors } from './utils/colors'
+import { RootState } from './store'
+import { Text, TextVariants } from './shared/Text'
+import { Join } from './features/streaming/Join'
+import { Feeds } from './features/streaming/Feeds'
 
 const Outer = styled.div`
   width: 100vw;
   height: 100vh;
+  padding: 1rem;
   background-color: ${colors.main};
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
 `
 
 function App() {
-  useEffect(() => {
-    console.warn(streamingClient)
-  }, [])
+  const { initialized, connected } = useSelector((state: RootState) => ({
+    initialized: state.streamingClient.initialized,
+    connected: state.streamingClient.connected,
+  }));
+
   return (
     <Outer>
-        <div style={{display: 'flex', justifyContent: 'center', flexGrow: 1}}><Video source="local"/></div>
-        <div style={{display: 'flex', justifyContent: 'center', flexGrow: 1}}><Video source="remote"/></div>
+      {
+        initialized
+          ? connected
+            ? <Feeds />
+            : <Join />
+          : <div>
+            <Text>Loading</Text>
+          </div>
+      }
     </Outer>
   )
 }

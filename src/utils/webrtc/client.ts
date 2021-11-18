@@ -1,25 +1,31 @@
 import { EvtMessage, FeedPublisher, Janus, JSEP, Message, PluginHandle, SubscriptionHandle } from 'janus-gateway'
 import { action, ActionTypes, dispatch } from '../stub/dispatch'
 import { single } from '../singleton'
-import { attachVideo, detachVideo, initialize } from '../../features/streaming/client'
+import { attachLocal, attachRemote, connect, detachRemote, detachVideo, initialize } from '../../features/streaming/client'
 import { store } from '../../store'
 import { iceServers } from '../consts'
 import { noop } from '../flow'
+import { Feed } from './feed'
+import cuid from 'cuid'
 
 export class WebRTCClient {
+  public id: string;
   public client: Janus
   public videoroom?: PluginHandle
   public roomId: number
   public opaqueId: string
   public initialized: boolean = false
   public ready: boolean = false
-  private subscriptions: Record<string, SubscriptionHandle> = {}
-  public username: string = 'Alex'
+  public subscriptions: Record<string, SubscriptionHandle> = {}
+  public feeds: Record<string, Feed> = {};
+
+  public username: string = 'default'
 
   private privateId?: number
 
   constructor(server: string) {
     this.roomId = 4321
+    this.id = cuid();
     this.opaqueId = 'ckvlch20g00003c5gr2c42pfd'//cuid()
 
     Janus.init({
@@ -45,9 +51,9 @@ export class WebRTCClient {
     })
   }
 
-  connect = () => {
+  connect = (username: string) => {
     if (!this.ready) return
-
+    this.username = username;
     this.connectLocal()
     this.initialized = true
   }
@@ -68,43 +74,13 @@ export class WebRTCClient {
       onmessage: this.onLocalMessage,
       onlocalstream: (stream) => {
         Janus.attachMediaStream(document.querySelector('#localvideo')!, stream)
-        setTimeout(() => store.dispatch(attachVideo('local')), 600)
+        setTimeout(() => store.dispatch(attachLocal()), 600)
       },
-      onremotestream: (stream) => {
-        Janus.debug(' ::: Got a remote stream :::', stream)
-        Janus.attachMediaStream(document.querySelector('#remotevideo')!, stream)
-        setTimeout(() => store.dispatch(attachVideo('remote')), 600)
-      },
+      onremotestream: noop,
       webrtcState: (on) => {
         Janus.log('Janus says our WebRTC PeerConnection is ' + (on ? 'up' : 'down') + ' now')
         // this.videoroom!.send({ message: { request: "configure", bitrate: 300 }})
       },
-    })
-  }
-
-  private subscribeToRemote = () => {
-    const { opaqueId } = this
-
-    this.client.attach({
-      plugin: 'janus.plugin.videoroom',
-      opaqueId,
-      success: (videoroom) => {
-        this.videoroom = videoroom
-        this.attemptJoin()
-      },
-      error: this.onError,
-      consentDialog: (on) => {/*TODO*/},
-      onmessage: this.onLocalMessage,
-      onlocalstream: (stream) => {
-        Janus.attachMediaStream(document.querySelector('#localvideo')!, stream)
-      },
-      onremotestream: (stream) => {
-        Janus.debug(' ::: Got a remote stream :::', stream)
-        Janus.attachMediaStream(document.querySelector('#remotevideo')!, stream)
-        console.warn('.', stream.getVideoTracks())
-      },
-      webrtcState: this.onState('rtc'),
-      iceState: this.onState('ice'),
     })
   }
 
@@ -132,8 +108,9 @@ export class WebRTCClient {
         room: this.roomId,
         display: this.username
       }
-    })
-    console.warn('aaa')
+    });
+
+    store.dispatch(connect())
   }
 
   private createRoom = () => {
@@ -157,6 +134,8 @@ export class WebRTCClient {
     this.videoroom!.createOffer(
       {
         media: { audioRecv: false, videoRecv: false, audioSend: true, videoSend: true },
+        simulcast: true,
+        simulcast1: true,
         success: (jsep: any) => {
           this.videoroom!.send({
             message: { request: 'configure', audio: true, video: false },
@@ -215,15 +194,9 @@ export class WebRTCClient {
         iceState: this.onState('ice', publisher.id),
         webrtcState: this.onState('rtc', publisher.id),
         onlocalstream: noop,
-        onremotestream: function (stream) {
-          console.warn('aaaaa')
-          Janus.attachMediaStream(document.querySelector('#remotevideo')!, stream)
-          setTimeout(() => store.dispatch(attachVideo('remote')), 600)
-          var videoTracks = stream.getVideoTracks();
-
-          if (!videoTracks || videoTracks.length === 0) {
-            // TODO: Handle cases when there is no video;
-          }
+        onremotestream: (stream) => {
+          const feed = new Feed(stream, publisher.id);
+          this.feeds[feed.key] = feed;
         },
         oncleanup: () => {
           setTimeout(() => store.dispatch(detachVideo('remote')), 600)
@@ -247,7 +220,9 @@ export class WebRTCClient {
       this.privateId = msg.private_id
       this.attemptPublish()
     } else if (event === 'event') {
-
+      if(msg.unpublished) {
+        store.dispatch(detachRemote(`${msg.unpublished}`))
+      }
     }
     if (msg.error) {
       console.error(msg)
@@ -262,7 +237,7 @@ export class WebRTCClient {
     }
   }
 
-  private onRemoteMessage = (publisherId: string) => (msg: EvtMessage, jsep?: JSEP) => {
+  private onRemoteMessage = (publisherId: string) => (msg: any, jsep?: JSEP) => {
     const feed = this.subscriptions[publisherId];
 
     if (!feed) {
@@ -285,7 +260,13 @@ export class WebRTCClient {
 
         Janus.log(`Attached feed ${feed.rfid} (${feed.rfdisplay}) in ${this.roomId}`)
       } else if (event === 'event') {
-        // TODO: handle remote simulcast
+        let {substream, temporal} = msg;
+        if((substream !== null && substream !== undefined) || (temporal !== null && temporal !== undefined)) {
+          this.feeds[publisherId].simulcastEnabled = true;
+        }
+        if(msg.unpublished) {
+          store.dispatch(detachRemote(`${msg.unpublished}`))
+        }
       }
     }
 
@@ -320,6 +301,10 @@ export class WebRTCClient {
   }
 }
 
+
+
 export const streamingClient = single<WebRTCClient>(
   () => new WebRTCClient(process.env.WEBRTC_SERVER)
 )
+// @ts-ignore
+window.sc = streamingClient;

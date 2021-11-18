@@ -1,8 +1,7 @@
-import React, { FC } from 'react'
-import { useSelector } from 'react-redux'
+import React, { FC, useState } from 'react'
 import styled, { css } from 'styled-components'
 import { colors } from '../../utils/colors'
-import { RootState } from '../../store'
+import { Text } from '../../shared/Text'
 
 const LargeText = styled.h2`
   color: ${colors.accent};
@@ -13,31 +12,25 @@ const LargeText = styled.h2`
   font-weight: 700;
 `
 
-const Display = styled.video.attrs(() => ({ autoPlay: true, playsInline: true }))<{ show: boolean }>`
-  border: 5px solid ${colors.accent};
+const Display = styled.video.attrs(() => ({ autoPlay: true, playsInline: true }))<{ modest?: boolean, show: boolean }>`
+  border: 3px solid ${colors.accent};
   border-radius: 1rem;
   display: block;
+  height: auto;
+  transition: width .3s ease;
+  ${({modest}) => modest ? css`width: 150px;` : css`width: 55vw;` }
   ${({ show }) => show ? '' : css`
     width: 0;
     height: 0;
-    opacity: 0` 
+    opacity: 0`
   }
 `
 
-export const Video: FC<{ source: 'local' | 'remote' }> = ({ source }) => {
-  const hasVideo = useSelector((state: RootState) => state.streamingClient.sources[source].hasVideo)
+export const Video: FC<{ modest?: boolean }> = ({ modest }) => {
+  const [ready, setReady] = useState(false)
 
   return <>
-    {
-      (source  === 'local' && !hasVideo)
-        ? <LargeText>Connecting you to remote session <br /><br /> Please give the browser access to your recording devices</LargeText>
-      : null
-    }
-    {
-      (source  === 'remote' && !hasVideo)
-        ? <LargeText>Looks like you're the only one here yet</LargeText>
-      : null
-    }
-    <Display id={`${source}video`} show={!!hasVideo}/>
+    <Display modest={modest} onCanPlay={() => setReady(true)} id={`localvideo`} show={ready} muted/>
+    {ready ? null : <Text>Connecting</Text>}
   </>
 }
