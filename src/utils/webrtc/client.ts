@@ -1,7 +1,13 @@
 import { EvtMessage, FeedPublisher, Janus, JSEP, Message, PluginHandle, SubscriptionHandle } from 'janus-gateway'
 import { action, ActionTypes, dispatch } from '../stub/dispatch'
 import { single } from '../singleton'
-import { attachLocal, attachRemote, connect, detachRemote, detachVideo, initialize } from '../../features/streaming/client'
+import {
+  attachLocal,
+  connect,
+  detachVideo,
+  disconnect,
+  initialize, toggleLocalMute, toggleLocalVideo
+} from '../../features/streaming/client'
 import { store } from '../../store'
 import { iceServers } from '../consts'
 import { noop } from '../flow'
@@ -9,7 +15,7 @@ import { Feed } from './feed'
 import cuid from 'cuid'
 
 export class WebRTCClient {
-  public id: string;
+  public id: string
   public client: Janus
   public videoroom?: PluginHandle
   public roomId: number
@@ -17,7 +23,7 @@ export class WebRTCClient {
   public initialized: boolean = false
   public ready: boolean = false
   public subscriptions: Record<string, SubscriptionHandle> = {}
-  public feeds: Record<string, Feed> = {};
+  public feeds: Record<string, Feed> = {}
 
   public username: string = 'default'
 
@@ -25,7 +31,7 @@ export class WebRTCClient {
 
   constructor(server: string) {
     this.roomId = 4321
-    this.id = cuid();
+    this.id = cuid()
     this.opaqueId = 'ckvlch20g00003c5gr2c42pfd'//cuid()
 
     Janus.init({
@@ -39,6 +45,7 @@ export class WebRTCClient {
 
     this.client = new Janus({
       server,
+      destroyOnUnload: true,
       iceServers,
       success: () => {
         this.ready = true
@@ -53,7 +60,7 @@ export class WebRTCClient {
 
   connect = (username: string) => {
     if (!this.ready) return
-    this.username = username;
+    this.username = username
     this.connectLocal()
     this.initialized = true
   }
@@ -108,7 +115,7 @@ export class WebRTCClient {
         room: this.roomId,
         display: this.username
       }
-    });
+    })
 
     store.dispatch(connect())
   }
@@ -195,11 +202,12 @@ export class WebRTCClient {
         webrtcState: this.onState('rtc', publisher.id),
         onlocalstream: noop,
         onremotestream: (stream) => {
-          const feed = new Feed(stream, publisher.id);
-          this.feeds[feed.key] = feed;
+          const subscription = this.subscriptions[publisher.id]
+          const feed = new Feed(stream, publisher.id)
+          this.feeds[feed.key] = feed
+          this.feeds[feed.key].setDisplay(subscription.rfdisplay!)
         },
         oncleanup: () => {
-          setTimeout(() => store.dispatch(detachVideo('remote')), 600)
           this.subscriptions = Object.entries(this.subscriptions)
             .reduce<Record<string, SubscriptionHandle>>((obj, [key, feed]) => {
               if (key !== publisher.id) {
@@ -220,8 +228,13 @@ export class WebRTCClient {
       this.privateId = msg.private_id
       this.attemptPublish()
     } else if (event === 'event') {
-      if(msg.unpublished) {
-        store.dispatch(detachRemote(`${msg.unpublished}`))
+      if (msg.unpublished) {
+        if (msg.unpublished === 'ok') {
+          this.videoroom!.hangup()
+          store.dispatch(disconnect())
+        } else {
+          this.feeds[msg.unpublished].detach()
+        }
       }
     }
     if (msg.error) {
@@ -238,15 +251,13 @@ export class WebRTCClient {
   }
 
   private onRemoteMessage = (publisherId: string) => (msg: any, jsep?: JSEP) => {
-    const feed = this.subscriptions[publisherId];
+    const feed = this.subscriptions[publisherId]
 
     if (!feed) {
       console.error(`Looking for nonexistent feed, ${publisherId}`)
       return
     }
     const event = msg.videoroom
-
-    console.warn(msg, feed)
 
     if (msg.error) {
       this.onError(msg.error)
@@ -257,21 +268,16 @@ export class WebRTCClient {
       if (event === 'attached') {
         feed.rfid = msg.id
         feed.rfdisplay = msg.display
-
-        Janus.log(`Attached feed ${feed.rfid} (${feed.rfdisplay}) in ${this.roomId}`)
       } else if (event === 'event') {
-        let {substream, temporal} = msg;
-        if((substream !== null && substream !== undefined) || (temporal !== null && temporal !== undefined)) {
-          this.feeds[publisherId].simulcastEnabled = true;
-        }
-        if(msg.unpublished) {
-          store.dispatch(detachRemote(`${msg.unpublished}`))
+        let { substream, temporal } = msg
+        if ((substream !== null && substream !== undefined) || (temporal !== null && temporal !== undefined)) {
+          this.feeds[publisherId].simulcastEnabled = true
         }
       }
     }
 
     if (jsep) {
-      var stereo = (jsep.sdp.indexOf('stereo=1') !== -1);
+      var stereo = (jsep.sdp.indexOf('stereo=1') !== -1)
 
       feed.createAnswer(
         {
@@ -299,12 +305,32 @@ export class WebRTCClient {
   private onState = (kind: 'ice' | 'rtc', id?: string) => (state: any) => {
     console.warn(`${kind} state${id ? ` of ${id} ` : ' '}is now ${typeof state === 'string' ? state : state ? 'up' : 'down'}`)
   }
-}
 
+  public toggleMute = (current: boolean) => {
+    this.videoroom!.send({
+      message: {request: 'configure', audio: current},
+    });
+
+    store.dispatch(toggleLocalMute(!current));
+  }
+
+  public toggleVideo = (current: boolean) => {
+
+    this.videoroom!.send({
+      message: {request: 'configure', video: !current},
+    });
+
+    store.dispatch(toggleLocalVideo(!current));
+  }
+
+  public disconnectLocal = () => {
+    this.videoroom!.send({ message: { request: 'unpublish' } })
+  }
+}
 
 
 export const streamingClient = single<WebRTCClient>(
   () => new WebRTCClient(process.env.WEBRTC_SERVER)
 )
 // @ts-ignore
-window.sc = streamingClient;
+window.sc = streamingClient

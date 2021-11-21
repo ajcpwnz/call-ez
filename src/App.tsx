@@ -10,10 +10,8 @@ import { Feeds } from './features/streaming/Feeds'
 const Outer = styled.div`
   width: 100vw;
   height: 100vh;
-  padding: 1rem;
   background-color: ${colors.main};
   display: flex;
-  align-items: center;
   justify-content: center;
 `
 
@@ -24,7 +22,7 @@ function App() {
   }));
 
   return (
-    <Outer>
+    <Outer className={'items-center'}>
       {
         initialized
           ? connected

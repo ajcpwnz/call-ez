@@ -2,6 +2,8 @@ import React, { FC, useState } from 'react'
 import styled, { css } from 'styled-components'
 import { colors } from '../../utils/colors'
 import { Text } from '../../shared/Text'
+import { RootState } from '../../store'
+import { useSelector } from 'react-redux'
 
 const LargeText = styled.h2`
   color: ${colors.accent};
@@ -18,7 +20,12 @@ const Display = styled.video.attrs(() => ({ autoPlay: true, playsInline: true })
   display: block;
   height: auto;
   transition: width .3s ease;
-  ${({modest}) => modest ? css`width: 150px;` : css`width: 55vw;` }
+  ${({modest}) => modest ? css`
+    width: 150px;
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+  ` : css`width: 55vw; margin: 5vh 0;` }
   ${({ show }) => show ? '' : css`
     width: 0;
     height: 0;
@@ -28,9 +35,11 @@ const Display = styled.video.attrs(() => ({ autoPlay: true, playsInline: true })
 
 export const Video: FC<{ modest?: boolean }> = ({ modest }) => {
   const [ready, setReady] = useState(false)
+  const cameraEnabled = useSelector((state: RootState) => state.streamingClient.sources.local.cameraEnabled);
 
   return <>
-    <Display modest={modest} onCanPlay={() => setReady(true)} id={`localvideo`} show={ready} muted/>
+    <Display modest={modest} onCanPlay={() => setReady(true)} id={`localvideo`} show={ready && cameraEnabled} muted/>
     {ready ? null : <Text>Connecting</Text>}
+    {cameraEnabled ? null : <Text>Camera disabled</Text>}
   </>
 }

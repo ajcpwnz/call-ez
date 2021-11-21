@@ -198,7 +198,7 @@ declare module 'janus-gateway' {
 
     hangup(sendRequest?: boolean): void;
 
-    detach(params: any): void;
+    detach(params?: any): void;
   }
 
   type SubscriptionHandle = PluginHandle & Partial<{
