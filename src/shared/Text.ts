@@ -4,6 +4,7 @@ import { colors } from '../utils/colors'
 export enum TextVariants {
   base = 'base',
   title = 'title',
+  small = 'small',
 }
 
 interface TextProps {
@@ -23,6 +24,12 @@ const variantStyles: Record<TextVariants, FlattenSimpleInterpolation> = {
     line-height: 1.45;
     font-weight: 700;
     margin: 0;
+  `,
+  small: css`
+    color: ${colors.body};
+    font-size: 14px;
+    line-height: 1.45;
+    font-weight: 700;
   `,
 }
 

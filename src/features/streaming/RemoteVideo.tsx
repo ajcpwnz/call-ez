@@ -33,7 +33,6 @@ const VideoBox = styled.div`
   padding-bottom: 56.25%; /* 16:9 */
   height: 0;
   overflow: hidden;
-  border-radius: 1rem;
   border: 3px solid ${colors.accent};
   background: ${colors.highlight};
   display: flex;
@@ -46,6 +45,16 @@ const VideoBox = styled.div`
     margin: auto;
     width: 100%;
     height: auto;
+    z-index: 5;
+    border-radius: .98rem;
+  } 
+  & > .controls {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 10;
+    padding: .125rem .25rem;
   }
 `
 
@@ -63,16 +72,15 @@ export const RemoteVideo: FC<{ lookup: string, display: RemoteFeedState }> = ({ 
 
 
   return <div className="flex flex-col" ref={outer}>
-    {/*<div className="flex items-center justify-between">*/}
-    {/*  <Text>{display.displayHandle}</Text>*/}
-    {/*  <div className="flex">*/}
-    {/*    <Picker label="bitrate" options={[1, 2, 3]} defaultValue={3} onChange={(val) => feed.configure('temporal', val as number)}/>*/}
-    {/*    <Picker label="quality" options={[0, 1, 2]} defaultValue={2} onChange={(val) => feed.configure('substream', val as number)}/>*/}
-    {/*  </div>*/}
-    {/*</div>*/}
-
     <VideoBox>
       <Display ref={ref} id={`remote-video-${lookup}`} show/>
+      <div className="controls flex items-center justify-between">
+        <Text>{display.displayHandle}</Text>
+        <div className="flex">
+          <Picker label="bitrate" options={[1, 2, 3]} defaultValue={3} onChange={(val) => feed.configure('temporal', val as number)}/>
+          <Picker label="quality" options={[0, 1, 2]} defaultValue={2} onChange={(val) => feed.configure('substream', val as number)}/>
+        </div>
+      </div>
     </VideoBox>
   </div>
 }

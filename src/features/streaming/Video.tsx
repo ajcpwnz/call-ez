@@ -1,7 +1,7 @@
 import React, { FC, useState } from 'react'
 import styled, { css } from 'styled-components'
 import { colors } from '../../utils/colors'
-import { Text } from '../../shared/Text'
+import { Text, TextVariants } from '../../shared/Text'
 import { RootState } from '../../store'
 import { useSelector } from 'react-redux'
 
@@ -39,7 +39,7 @@ export const Video: FC<{ modest?: boolean }> = ({ modest }) => {
 
   return <>
     <Display modest={modest} onCanPlay={() => setReady(true)} id={`localvideo`} show={ready && cameraEnabled} muted/>
-    {ready ? null : <Text>Connecting</Text>}
-    {cameraEnabled ? null : <Text>Camera disabled</Text>}
+    {ready ? null : <Text variant={TextVariants.small}>Connecting</Text>}
+    {cameraEnabled ? null : <Text variant={TextVariants.small}>Camera disabled</Text>}
   </>
 }
