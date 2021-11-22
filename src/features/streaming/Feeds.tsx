@@ -38,11 +38,7 @@ const LocalControls = () => {
 }
 
 export const Feeds = () => {
-  const feeds = useSelector((state: RootState) => {
-    const f = Object.values(state.streamingClient.sources.remote)[0]
-
-    return f ? [f,f,f,f,f] : []
-  })
+  const feeds = useSelector((state: RootState) => Object.values(state.streamingClient.sources.remote))
 
   const { width, height } = useScreensize()
   const bottomBar = useRef<HTMLDivElement>(null)
